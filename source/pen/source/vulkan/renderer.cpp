@@ -105,6 +105,69 @@ namespace
         return VK_FORMAT_R32G32B32A32_SFLOAT;
     }
 
+    VkIndexType to_vk_index_type(u32 pen_index_type)
+    {
+        switch (pen_index_type)
+        {
+        case PEN_FORMAT_R16_UINT:
+            return VK_INDEX_TYPE_UINT16;
+        case PEN_FORMAT_R32_UINT:
+            return VK_INDEX_TYPE_UINT32;
+        }
+        PEN_ASSERT(0);
+        return VK_INDEX_TYPE_UINT16;
+    }
+
+    VkFilter to_vk_filter(u32 pen_filter)
+    {
+        switch (pen_filter)
+        {
+        case PEN_FILTER_MIN_MAG_MIP_LINEAR:
+        case PEN_FILTER_LINEAR:
+            return VK_FILTER_LINEAR;
+        case PEN_FILTER_MIN_MAG_MIP_POINT:
+        case PEN_FILTER_POINT:
+            return VK_FILTER_NEAREST;
+        }
+        PEN_ASSERT(0);
+        return VK_FILTER_LINEAR;
+    }
+
+    VkSamplerMipmapMode to_vk_mip_map_mode(u32 pen_filter)
+    {
+        switch (pen_filter)
+        {
+        case PEN_FILTER_MIN_MAG_MIP_LINEAR:
+            return VK_SAMPLER_MIPMAP_MODE_LINEAR;
+        case PEN_FILTER_MIN_MAG_MIP_POINT:
+            return VK_SAMPLER_MIPMAP_MODE_NEAREST;
+        case PEN_FILTER_POINT:
+        case PEN_FILTER_LINEAR:
+            return VK_SAMPLER_MIPMAP_MODE_NEAREST;
+        }
+        PEN_ASSERT(0);
+        return VK_SAMPLER_MIPMAP_MODE_NEAREST;
+    }
+
+    VkSamplerAddressMode to_vk_sampler_address_mode(u32 pen_sampler_address_mode)
+    {
+        switch (pen_sampler_address_mode)
+        {
+        case PEN_TEXTURE_ADDRESS_WRAP:
+            return VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        case PEN_TEXTURE_ADDRESS_MIRROR:
+            return VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT;
+        case PEN_TEXTURE_ADDRESS_CLAMP:
+            return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+        case PEN_TEXTURE_ADDRESS_BORDER:
+            return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+        case PEN_TEXTURE_ADDRESS_MIRROR_ONCE:
+            return VK_SAMPLER_ADDRESS_MODE_MIRROR_CLAMP_TO_EDGE;
+        }
+        PEN_ASSERT(0);
+        return VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    }
+
     // vulkan internals
     struct vulkan_context
     {
@@ -129,7 +192,7 @@ namespace
         VkSemaphore                         sem_img_avail[NBB];
         VkSemaphore                         sem_render_finished[NBB];
         VkFence                             fences[NBB];
-        VkPhysicalDeviceMemoryProperties    mem_properties;
+        VkPhysicalDeviceMemoryProperties    mem_properties;                  
     };
     vulkan_context _ctx;
 
@@ -154,9 +217,10 @@ namespace
 
     struct vulkan_texture
     {
-        VkImageView image_view;
-        VkImage     image;
-        VkFormat    format;
+        VkImageView     image_view;
+        VkImage         image;
+        VkFormat        format;
+        VkDeviceMemory  mem = 0;
     };
 
     struct vulkan_buffer
@@ -477,7 +541,6 @@ namespace
             vkGetPhysicalDeviceSurfacePresentModesKHR(_ctx.physical_device, _ctx.surface, &num_formats, present_modes);
             delete present_modes;
         }
-
 
         VkSurfaceCapabilitiesKHR caps;
         CHECK_CALL(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(_ctx.physical_device, _ctx.surface, &caps));
@@ -860,12 +923,12 @@ namespace pen
 
         void renderer_make_context_current()
         {
-
+            // stub.. this function is for opengl
         }
 
         void renderer_sync()
         {
-
+            // stub.. this fnction is for metal
         }
 
         void renderer_create_clear_state(const clear_state& cs, u32 resource_slot)
@@ -926,7 +989,7 @@ namespace pen
 
         void renderer_link_shader_program(const shader_link_params& params, u32 resource_slot)
         {
-
+            // stub this function is for opengl
         }
 
         void renderer_create_buffer(const buffer_creation_params& params, u32 resource_slot)
@@ -991,7 +1054,8 @@ namespace pen
 
         void renderer_set_index_buffer(u32 buffer_index, u32 format, u32 offset)
         {
-
+            VkBuffer buf = _res_pool.get(buffer_index).buffer.buf;
+            vkCmdBindIndexBuffer(_ctx.cmd_bufs[_ctx.img_index], buf, offset, to_vk_index_type(format));
         }
 
         void renderer_set_constant_buffer(u32 buffer_index, u32 resource_slot, u32 flags)
@@ -1006,12 +1070,86 @@ namespace pen
 
         void renderer_create_texture(const texture_creation_params& tcp, u32 resource_slot)
         {
+            _res_pool.insert({}, resource_slot);
+            vulkan_texture& vt = _res_pool.get(resource_slot).texture;
 
+            // image
+            VkImageCreateInfo info = {};
+            info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+            info.extent.width = tcp.width;
+            info.extent.height = tcp.height;
+            info.extent.depth = tcp.collection_type == TEXTURE_COLLECTION_VOLUME ? tcp.num_arrays : 1;
+            info.arrayLayers = 1;
+            info.samples = (VkSampleCountFlagBits)tcp.sample_count;
+            info.mipLevels = tcp.num_mips;
+            info.imageType = VK_IMAGE_TYPE_2D;
+            info.format = VK_FORMAT_B8G8R8A8_UNORM;
+            info.usage = VK_IMAGE_USAGE_STORAGE_BIT;
+            info.tiling = VK_IMAGE_TILING_OPTIMAL;
+            info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+            info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+            CHECK_CALL(vkCreateImage(_ctx.device, &info, nullptr, &vt.image));
+
+            // memory
+            VkMemoryRequirements req;
+            vkGetImageMemoryRequirements(_ctx.device, vt.image, &req);
+
+            VkMemoryAllocateInfo alloc_info = {};
+            alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+            alloc_info.allocationSize = req.size;
+            alloc_info.memoryTypeIndex = get_mem_type(req.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+            CHECK_CALL(vkAllocateMemory(_ctx.device, &alloc_info, nullptr, &vt.mem));
+            CHECK_CALL(vkBindImageMemory(_ctx.device, vt.image, vt.mem, 0));
+
+            // image view
+            VkImageViewCreateInfo view_info = {};
+            view_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+            view_info.image = vt.image;
+            view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+            view_info.format = VK_FORMAT_B8G8R8A8_UNORM;
+            view_info.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+            view_info.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+            view_info.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+            view_info.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+            view_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            view_info.subresourceRange.baseMipLevel = 0;
+            view_info.subresourceRange.levelCount = 1;
+            view_info.subresourceRange.baseArrayLayer = 0;
+            view_info.subresourceRange.layerCount = 1;
+
+            CHECK_CALL(vkCreateImageView(_ctx.device, &view_info, nullptr, &vt.image_view));
+
+            // todo tile images and copy data
         }
 
         void renderer_create_sampler(const sampler_creation_params& scp, u32 resource_slot)
         {
+            VkSamplerCreateInfo info = {};
+            info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
 
+            info.magFilter = to_vk_filter(scp.filter);
+            info.minFilter = to_vk_filter(scp.filter);
+            info.mipmapMode = to_vk_mip_map_mode(scp.filter);
+
+            info.addressModeU = to_vk_sampler_address_mode(scp.address_u);
+            info.addressModeV = to_vk_sampler_address_mode(scp.address_v);
+            info.addressModeW = to_vk_sampler_address_mode(scp.address_w);
+
+            info.anisotropyEnable = scp.max_anisotropy > 0;
+            info.maxAnisotropy = scp.max_anisotropy;
+
+            info.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+
+            info.unnormalizedCoordinates = VK_FALSE;
+            info.compareEnable = VK_FALSE;
+
+            info.compareOp = VK_COMPARE_OP_ALWAYS;
+
+            info.mipLodBias = scp.mip_lod_bias;
+            info.minLod = scp.min_lod;
+            info.maxLod = scp.max_lod;
         }
 
         void renderer_set_texture(u32 texture_index, u32 sampler_index, u32 resource_slot, u32 bind_flags)
@@ -1082,14 +1220,24 @@ namespace pen
             vkCmdDraw(_ctx.cmd_bufs[_ctx.img_index], vertex_count, 1, 0, 0);
         }
 
-        void renderer_draw_indexed(u32 index_count, u32 start_index, u32 base_vertex, u32 primitive_topology)
+        inline void _draw_index_instanced(u32 instance_count, 
+            u32 start_instance, u32 index_count, u32 start_index, u32 base_vertex, u32 primitive_topology)
         {
-
+            vkCmdDrawIndexed(_ctx.cmd_bufs[_ctx.img_index], 
+                index_count, instance_count, start_index, base_vertex, start_instance);
         }
 
-        void renderer_draw_indexed_instanced(u32 instance_count, u32 start_instance, u32 index_count, u32 start_index, u32 base_vertex, u32 primitive_topology)
+        void renderer_draw_indexed(u32 index_count, u32 start_index, u32 base_vertex, u32 primitive_topology)
         {
+            bind_pipeline(primitive_topology);
 
+            _draw_index_instanced(1, 0, index_count, start_index, base_vertex, primitive_topology);
+        }
+
+        void renderer_draw_indexed_instanced(u32 instance_count, 
+            u32 start_instance, u32 index_count, u32 start_index, u32 base_vertex, u32 primitive_topology)
+        {
+            _draw_index_instanced(instance_count, start_instance, index_count, start_index, base_vertex, primitive_topology);
         }
 
         void renderer_draw_auto()
@@ -1210,7 +1358,9 @@ namespace pen
 
         void renderer_release_buffer(u32 buffer_index)
         {
-
+            vulkan_buffer& buf = _res_pool.get(buffer_index).buffer;
+            vkDestroyBuffer(_ctx.device, buf.buf, nullptr);
+            vkFreeMemory(_ctx.device, buf.mem, nullptr);
         }
 
         void renderer_release_texture(u32 texture_index)
