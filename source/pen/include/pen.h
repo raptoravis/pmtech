@@ -33,7 +33,8 @@ namespace pen
 
 // compiler
 #ifdef _MSC_VER
-#define pen_inline __forceinline
+//#define pen_inline __forceinline
+#define pen_inline inline
 #define pen_deprecated __declspec(deprecated)
 #define pen_debug_break __debug_break()
 #else
