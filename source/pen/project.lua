@@ -28,6 +28,12 @@ local function setup_win32()
             "$(VK_SDK_PATH)/Include"
         }
     end
+
+	includedirs
+	{
+		("../../third_party/Optick_1.2.8/include/")
+	}
+
     systemversion(windows_sdk_version())
     disablewarnings { "4800", "4305", "4018", "4244", "4267", "4996" }
 end

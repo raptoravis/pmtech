@@ -83,13 +83,24 @@ local function setup_win32()
         }
     end
     
+    libdirs
+    {
+		(pmtech_dir .. "third_party/Optick_1.2.8/lib/x64/release")
+    }
+
+	includedirs
+	{
+		(pmtech_dir .. "third_party/Optick_1.2.8/include/")
+	}
+
     links
     {
         "dxguid.lib",
         "winmm.lib", 
         "comctl32.lib", 
         "fmod64_vc.lib",
-        "Shlwapi.lib"	
+        "Shlwapi.lib",
+		"OptickCore.lib"
     }
 
 	add_pmtech_links()

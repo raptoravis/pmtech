@@ -15,6 +15,8 @@
 #include "data_struct.h"
 #include "str_utilities.h"
 
+#include "optick.h"
+
 extern a_u8    g_window_resize;
 pen::user_info pen_user_info;
 
@@ -33,6 +35,8 @@ static u32 s_return_code = 0;
 
 INT WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine, INT nCmdShow)
 {
+	//OPTICK_APP("pmtechApp");
+
     // console
     if (!AttachConsole(ATTACH_PARENT_PROCESS))
     {
@@ -79,6 +83,8 @@ INT WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine,
     // init renderer will enter a loop wait for rendering commands, and call os update
     HWND hwnd = (HWND)pen::window_get_primary_display_handle();
     pen::renderer_init((void*)&hwnd, true);
+
+	OPTICK_SHUTDOWN();
 
     // exit program
     return s_return_code;

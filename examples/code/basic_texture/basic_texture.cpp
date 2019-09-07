@@ -9,6 +9,8 @@
 #include "threads.h"
 #include "timer.h"
 
+#include "optick.h"
+
 using namespace put;
 
 pen::window_creation_params pen_window{
@@ -31,6 +33,9 @@ struct textured_vertex
 
 PEN_TRV pen::user_entry(void* params)
 {
+    //OPTICK_FRAME("renderer_wait_for_jobs");
+	OPTICK_THREAD("user_entry");
+
     // unpack the params passed to the thread and signal to the engine it ok to proceed
     pen::job_thread_params* job_params = (pen::job_thread_params*)params;
     pen::job*               p_thread_info = job_params->job_info;
@@ -121,6 +126,9 @@ PEN_TRV pen::user_entry(void* params)
 
     while (1)
     {
+        //OPTICK_EVENT("IssueRenderCmd");
+        OPTICK_CATEGORY("IssueRenderCmd", Optick::Category::Rendering);
+
         pen::renderer_set_rasterizer_state(raster_state);
 
         // bind back buffer and clear

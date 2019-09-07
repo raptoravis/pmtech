@@ -17,6 +17,8 @@
 #include "threads.h"
 #include "timer.h"
 
+#include "optick.h"
+
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb/stb_image_write.h"
 
@@ -542,6 +544,8 @@ namespace pen
 
         for (;;)
         {
+			OPTICK_FRAME("renderer_wait_for_jobs");
+
             if (!renderer_dispatch())
                 pen::thread_sleep_us(100);
 
