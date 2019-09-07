@@ -6,4 +6,4 @@
 	url = https://github.com/polymonster/maths.git
 [submodule "third_party/pmfx-shader"]
 	path = third_party/pmfx-shader
-	url = https://github.com/polymonster/pmfx-shader.git
+	url = git@github.com:raptoravis/pmfx-shader.git
