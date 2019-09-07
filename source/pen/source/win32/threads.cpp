@@ -5,6 +5,8 @@
 #include "threads.h"
 #include "memory.h"
 
+#include "optick.h"
+
 namespace pen
 {
     typedef struct thread
@@ -23,11 +25,44 @@ namespace pen
         HANDLE handle;
     } semaphore;
 
+	struct thread_param_t
+	{
+		LPTHREAD_START_ROUTINE entry = 0;
+        void*                  params;
+	};
+
+    static PEN_TRV s_thread_func_wrapper(void* params)
+    {
+        thread_param_t* pP = (thread_param_t*)params;
+
+		if (pP)
+		{
+			LPTHREAD_START_ROUTINE entry = pP->entry;
+	        void*                  params = pP->params;
+
+			pen::memory_free(pP);
+
+			if (entry)
+			{
+				OPTICK_THREAD("WorkerThread");
+
+				return entry(params);
+			}
+		}
+
+		return PEN_THREAD_OK;
+    }
+
     pen::thread* thread_create(PEN_THREAD_ROUTINE(thread_func), u32 stack_size, void* thread_params, thread_start_flags flags)
     {
         pen::thread* new_thread = (pen::thread*)pen::memory_alloc(sizeof(pen::thread));
 
-        new_thread->handle = CreateThread(NULL, stack_size, thread_func, thread_params, flags, &new_thread->id);
+		thread_param_t* _thread_params = (thread_param_t*)pen::memory_alloc(sizeof(thread_param_t));
+        
+		_thread_params->entry = thread_func;
+        _thread_params->params = thread_params;
+
+        new_thread->handle = CreateThread(NULL, stack_size, s_thread_func_wrapper, _thread_params, flags, &new_thread->id);
 
         return new_thread;
     }
