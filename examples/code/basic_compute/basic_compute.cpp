@@ -10,6 +10,8 @@
 #include "threads.h"
 #include "timer.h"
 
+#include "optick.h"
+
 using namespace put;
 
 pen::window_creation_params pen_window{
@@ -133,12 +135,14 @@ PEN_TRV pen::user_entry(void* params)
 
     while (1)
     {
+        OPTICK_CATEGORY("IssueRenderCmd", Optick::Category::Rendering);
+
         // do a compute job to make the image greyscale
         pmfx::set_technique_perm(compute_shader, PEN_HASH("greyscale"), 0);
         pen::renderer_set_texture(test_texture, 0, 0, pen::TEXTURE_BIND_CS); // read
         pen::renderer_set_texture(test_output, 0, 1, pen::TEXTURE_BIND_CS);  // write
 
-        uint3 grid = {ti.width, ti.height, 1};
+        uint3 grid = {ti.width / 16, ti.height / 16, 1};
         uint3 threads = {16, 16, 1};
 
         pen::renderer_dispatch_compute(grid, threads);
@@ -158,6 +162,8 @@ PEN_TRV pen::user_entry(void* params)
 
         // draw quad
         {
+            OPTICK_CATEGORY("DrawQuad", Optick::Category::Rendering);
+
             // bind vertex layout and shaders
             pmfx::set_technique(textured_shader, 0);
 

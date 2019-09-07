@@ -503,6 +503,8 @@ namespace pen
 
     void renderer_consume_cmd_buffer()
     {
+        OPTICK_CATEGORY("renderer_consume_cmd_buffer", Optick::Category::Rendering);
+
         if (p_consume_semaphore)
         {
             semaphore_post(p_consume_semaphore, 1);
@@ -515,8 +517,12 @@ namespace pen
 
     bool renderer_dispatch()
     {
+        OPTICK_EVENT("renderer_dispatch");
+
         if (semaphore_try_wait(p_consume_semaphore))
         {
+	        OPTICK_EVENT("renderer_dispatch_consume");
+
             // some api's need to set the current context on the caller thread.
             direct::renderer_make_context_current();
 
