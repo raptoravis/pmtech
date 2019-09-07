@@ -4,6 +4,7 @@
 
 #include "renderer.h"
 #include "threads.h"
+#include "memory.h"
 
 namespace pen
 {
@@ -55,10 +56,18 @@ namespace pen
 
     bool jobs_terminate_all()
     {
+		// free p_thread which was alloced in jobs_create_job
+        for (s32 i = s_num_active_threads - 1; i >= 0; --i)
+		{
+			pen::memory_free(s_jt[i].p_thread);
+            s_jt[i].p_thread = 0;
+		}
+
         // remove threads in reverse order
         for (s32 i = s_num_active_threads - 1; i > 0; --i)
         {
             pen::semaphore_post(s_jt[i].p_sem_exit, 1);
+
             if (pen::semaphore_try_wait(s_jt[i].p_sem_terminated))
             {
                 s_num_active_threads--;
