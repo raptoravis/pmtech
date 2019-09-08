@@ -521,7 +521,7 @@ namespace pen
 
         if (semaphore_try_wait(p_consume_semaphore))
         {
-	        OPTICK_EVENT("renderer_dispatch_consume");
+            OPTICK_EVENT("renderer_dispatch_consume");
 
             // some api's need to set the current context on the caller thread.
             direct::renderer_make_context_current();
@@ -543,6 +543,75 @@ namespace pen
         return false;
     }
 
+    static void throttleFps_tmp()
+    {
+        OPTICK_EVENT();
+
+        static f32         s_frame_accumulator = 0;
+        static pen::timer* dt_timer = pen::timer_create();
+
+        f32 dt = 0;
+
+        if (s_frame_accumulator == 0)
+        {
+            dt = pen::timer_elapsed_ms(dt_timer) * 0.001f;
+        }
+
+        pen::timer_start(dt_timer);
+
+        if (abs(dt - 1.0 / 120.0) < .0002)
+        {
+            dt = 1.0 / 120.0;
+        }
+        if (abs(dt - 1.0 / 60.0) < .0002)
+        {
+            dt = 1.0 / 60.0;
+        }
+        if (abs(dt - 1.0 / 30.0) < .0002)
+        {
+            dt = 1.0 / 30.0;
+        }
+        s_frame_accumulator += dt;
+
+        while (s_frame_accumulator >= 1.0 / 60.0)
+        {
+            //update(1.0 / 60.0f);
+
+            s_frame_accumulator -= 1.0 / 60.0;
+        }
+    }
+
+    static void throttleFps(u32 fps = 60)
+    {
+        OPTICK_EVENT();
+
+        static bool        s_flag = false;
+        static pen::timer* dt_timer = pen::timer_create();
+
+        f32 dt = 0;
+
+        pen::timer_start(dt_timer);
+
+        if (!s_flag)
+        {
+            s_flag = true;
+        }
+        else
+		{
+            PEN_ASSERT(fps > 1);
+
+            const f32 time_per_frame = 1.0f / (fps + 0.5f);
+            dt = pen::timer_elapsed_ms(dt_timer) * 0.001f;
+
+	        if (dt < time_per_frame)
+	        {
+	            f32 timeToSleep = time_per_frame - dt;
+
+	            pen::thread_sleep_ms(timeToSleep * 1000.0);
+	        }
+        }
+    }
+
     void renderer_wait_for_jobs()
     {
         // this is a dedicated thread which stays for the duration of the program
@@ -550,7 +619,9 @@ namespace pen
 
         for (;;)
         {
-			OPTICK_FRAME("renderer_wait_for_jobs");
+            OPTICK_FRAME("renderer_wait_for_jobs");
+
+            throttleFps();
 
             if (!renderer_dispatch())
                 pen::thread_sleep_us(100);
@@ -1049,7 +1120,7 @@ namespace pen
     }
 
     void renderer_set_texture(u32 texture_index, u32 sampler_index, u32 resource_slot, u32 bind_flags)
-    {        
+    {
         renderer_cmd cmd;
 
         cmd.command_index = CMD_SET_TEXTURE;
@@ -1175,8 +1246,8 @@ namespace pen
     void renderer_update_buffer(u32 buffer_index, const void* data, u32 data_size, u32 offset)
     {
         renderer_cmd cmd;
-        
-        if(buffer_index == 80)
+
+        if (buffer_index == 80)
             u32 a = 0;
 
         if (buffer_index == 0)
