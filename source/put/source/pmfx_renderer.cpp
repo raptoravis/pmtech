@@ -506,7 +506,7 @@ namespace put
             s_geometry.screen_quad_ib = pen::renderer_create_buffer(bcp);
         }
 
-        void parse_sampler_bindings(pen::json render_config, view_params& vp)
+        void parse_sampler_bindings(const pen::json& render_config, view_params& vp)
         {
             std::vector<sampler_binding>& bindings = vp.sampler_bindings;
             pen::json                     j_sampler_bindings = render_config["sampler_bindings"];
@@ -557,7 +557,7 @@ namespace put
             }
         }
 
-        void parse_sampler_states(pen::json render_config)
+        void parse_sampler_states(const pen::json& render_config)
         {
             pen::json j_sampler_states = render_config["sampler_states"];
             s32       num = j_sampler_states.size();
