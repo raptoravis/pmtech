@@ -503,7 +503,7 @@ namespace pen
 
     void renderer_consume_cmd_buffer()
     {
-        OPTICK_CATEGORY("renderer_consume_cmd_buffer", Optick::Category::Rendering);
+        OPTICK_EVENT("wait_exec_cmd_buffer");
 
         if (p_consume_semaphore)
         {
@@ -517,11 +517,12 @@ namespace pen
 
     bool renderer_dispatch()
     {
-        OPTICK_EVENT("renderer_dispatch");
+        OPTICK_CATEGORY("renderer_dispatch", Optick::Category::Rendering);
 
         if (semaphore_try_wait(p_consume_semaphore))
         {
-            OPTICK_EVENT("exec_cmds");
+            //OPTICK_EVENT("exec_cmds");
+            OPTICK_CATEGORY("exec_cmds", OPTICK_MAKE_CATEGORY(Optick::Filter::Rendering, Optick::Color::Green));
 
             // some api's need to set the current context on the caller thread.
             direct::renderer_make_context_current();
@@ -589,14 +590,13 @@ namespace pen
 
     static void throttleFps(u32 fps = 60)
     {
-        OPTICK_EVENT();
+        //OPTICK_EVENT();
+        OPTICK_CATEGORY("throttleFps", Optick::Category::WaitEmpty);
 
         static bool        s_flag = false;
         static pen::timer* dt_timer = pen::timer_create();
 
         f32 dt = 0;
-
-        pen::timer_start(dt_timer);
 
         if (!s_flag)
         {
@@ -606,7 +606,7 @@ namespace pen
 		{
             PEN_ASSERT(fps > 1);
 
-            const f32 time_per_frame = 1.0f / (fps + 0.5f);
+            const f32 time_per_frame = 1.0f / (fps + 0.1f);
             dt = pen::timer_elapsed_ms(dt_timer) * 0.001f;
 
 	        if (dt < time_per_frame)
@@ -616,6 +616,8 @@ namespace pen
 	            pen::thread_sleep_ms(timeToSleep * 1000.0);
 	        }
         }
+
+        pen::timer_start(dt_timer);
     }
 
     void renderer_wait_for_jobs()
@@ -627,13 +629,13 @@ namespace pen
         {
             OPTICK_FRAME("renderer_wait_for_jobs");
 
-            throttleFps();
-
             if (!renderer_dispatch())
                 pen::thread_sleep_us(100);
 
             if (!pen::os_update())
                 break;
+
+            throttleFps();
         }
     }
 
