@@ -17,6 +17,8 @@
 #include "str_utilities.h"
 #include "timer.h"
 
+#include "optick.h"
+
 using namespace put;
 using namespace ecs;
 
@@ -34,6 +36,8 @@ namespace physics
 
 void blend_mode_ui()
 {
+    OPTICK_EVENT();
+
     bool opened = true;
     ImGui::Begin("Blend Modes", &opened, ImGuiWindowFlags_AlwaysAutoResize);
 
@@ -71,6 +75,8 @@ void blend_mode_ui()
 
 void blend_layers(const scene_view& scene_view)
 {
+    OPTICK_EVENT();
+
     static ecs::geometry_resource* quad = ecs::get_geometry_resource(PEN_HASH("full_screen_quad"));
 
     static u32 background_texture = put::load_texture("data/textures/blend_test_bg.dds");
@@ -126,6 +132,8 @@ PEN_TRV pen::user_entry(void* params)
 
     while (1)
     {
+        OPTICK_CATEGORY("IssueRenderCommand", Optick::Category::Rendering);
+
         static pen::timer* frame_timer = pen::timer_create();
         pen::timer_start(frame_timer);
 
@@ -146,8 +154,12 @@ PEN_TRV pen::user_entry(void* params)
 
         pen::renderer_consume_cmd_buffer();
 
-        pmfx::poll_for_changes();
-        put::poll_hot_loader();
+		{
+            OPTICK_EVENT("hotload");
+
+			pmfx::poll_for_changes();
+			put::poll_hot_loader();
+		}
 
         // msg from the engine we want to terminate
         if (pen::semaphore_try_wait(p_thread_info->p_sem_exit))
