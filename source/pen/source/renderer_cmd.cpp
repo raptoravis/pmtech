@@ -521,12 +521,14 @@ namespace pen
 
         if (semaphore_try_wait(p_consume_semaphore))
         {
-            OPTICK_EVENT("renderer_dispatch_consume");
+            OPTICK_EVENT("exec_cmds");
 
             // some api's need to set the current context on the caller thread.
             direct::renderer_make_context_current();
 
             semaphore_post(p_continue_semaphore, 1);
+
+			s32 cmds = 0;
 
             renderer_cmd* cmd = _cmd_buffer.get();
             while (cmd)
@@ -535,7 +537,11 @@ namespace pen
                 exec_cmd(foff);
 
                 cmd = _cmd_buffer.get();
+
+				cmds++;
             }
+
+            OPTICK_TAG("cmds", cmds);
 
             return true;
         }
