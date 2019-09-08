@@ -36,6 +36,9 @@ namespace pen
 
         jt->p_thread = thread_create(thread_func, stack_size, (void*)&params, flags);
 
+		//s32 idx = s_num_active_threads - 1;
+        //thread_set_affinity(jt->p_thread, 1 << idx);
+
         // wait till the thread initialises so any data passed to it is ok.
         pen::semaphore_wait(jt->p_sem_continue);
 
