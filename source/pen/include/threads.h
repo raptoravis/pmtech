@@ -73,6 +73,8 @@ namespace pen
     void    thread_sleep_ms(u32 milliseconds);
     void    thread_sleep_us(u32 microseconds);
 
+	void thread_set_affinity(pen::thread* p_thread, s32 processorMask);
+
     // Jobs
     void jobs_create_default(const default_thread_info& info);
     bool jobs_terminate_all();

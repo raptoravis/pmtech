@@ -66,6 +66,11 @@ namespace pen
 
         return new_thread;
     }
+    
+	void thread_set_affinity(pen::thread* p_thread, s32 processorMask)
+	{
+        SetThreadAffinityMask(p_thread->handle, processorMask);
+	}
 
     void thread_destroy(pen::thread* p_mutex)
     {
